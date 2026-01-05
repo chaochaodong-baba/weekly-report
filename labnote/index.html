@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Supabase 零成本周报</title>
+    <!-- 引入 Vue3, Supabase JS, Docx 库 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+    <style>
+        /* 简单美观的样式 */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 15px; max-width: 600px; margin: 0 auto; color: #333; }
+        .card { background: white; padding: 16px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 16px; }
+        h3 { margin-top: 0; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+        textarea { width: 100%; border: 1px solid #e1e4e8; border-radius: 8px; padding: 12px; box-sizing: border-box; resize: none; height: 100px; font-size: 16px; margin-bottom: 10px; }
+        textarea:focus { outline: none; border-color: #3ecf8e; }
+        .btn-group { display: flex; gap: 10px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; font-size: 15px; }
+        button:active { opacity: 0.8; }
+        .btn-primary { background: #3ecf8e; color: #fff; } /* Supabase Green */
+        .btn-secondary { background: #e1e4e8; color: #333; }
+        .btn-export { background: #24292e; color: white; width: 100%; margin-top: 5px; }
+        
+        .list-item { padding: 15px 0; border-bottom: 1px solid #eee; }
+        .list-item:last-child { border-bottom: none; }
+        .time-tag { font-size: 12px; color: #999; margin-bottom: 6px; display: block; }
+        .content-text { font-size: 16px; line-height: 1.5; white-space: pre-wrap; }
+        img { max-width: 100%; border-radius: 8px; margin-top: 8px; border: 1px solid #eee; }
+        audio { width: 100%; margin-top: 8px; }
+        .empty-tip { text-align: center; color: #999; padding: 20px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- 顶部输入区 -->
+        <div class="card">
+            <h3>📝 新记录</h3>
+            <textarea v-model="inputText" placeholder="记录此刻的想法..."></textarea>
+            <div class="btn-group">
+                <button class="btn-primary" @click="sendText" :disabled="loading">发送文字</button>
+                <button class="btn-secondary" @click="triggerFile" :disabled="loading">📷 图片/🎤 录音</button>
+            </div>
+            <!-- 隐藏的文件输入框 -->
+            <input type="file" ref="fileInput" @change="handleFile" style="display: none;" accept="image/*,audio/*">
+            <div v-if="loading" style="text-align:center; font-size:12px; color:#666; margin-top:5px;">处理中...</div>
+        </div>
+
+        <!-- 导出按钮 -->
+        <button class="btn-export" @click="generateWord">📤 导出近7天周报 (Word)</button>
+
+        <!-- 列表区 -->
+        <div class="card" style="margin-top: 15px;">
+            <h3>👀 实时同步 ({{ records.length }})</h3>
+            <div v-if="records.length === 0" class="empty-tip">暂无记录，发一条试试？</div>
+            
+            <div v-for="item in records" :key="item.id" class="list-item">
+                <span class="time-tag">{{ formatTime(item.created_at) }}</span>
+                
+                <!-- 文本展示 -->
+                <div v-if="item.type === 'text'" class="content-text">{{ item.content }}</div>
+                
+                <!-- 图片展示 -->
+                <div v-if="item.type === 'image'">
+                    <img :src="item.content" loading="lazy">
+                </div>
+                
+                <!-- 音频展示 -->
+                <div v-if="item.type === 'audio'">
+                    <audio controls :src="item.content"></audio>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createClient } = supabase;
+
+        // ============================================================
+        // ⚠️ 请在这里填入你的 Supabase 配置信息
+        // ============================================================
+        const SUPABASE_URL = 'https://aampvlfsesvtzfnmvvbp.supabase.co'; 
+        const SUPABASE_KEY = 'sb_publishable_1_pxVl2u74y-orx9fQfadQ_PSl1HQar'; 
+        // ============================================================
+
+        const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        Vue.createApp({
+            data() {
+                return {
+                    inputText: '',
+                    records: [],
+                    loading: false
+                }
+            },
+            async mounted() {
+                await this.cleanupOldData(); // 1. 启动时尝试清理旧数据
+                await this.loadRecords();    // 2. 加载数据
+                this.initRealtime();         // 3. 开启实时监听
+            },
+            methods: {
+                // 加载最近7天的数据
+                async loadRecords() {
+                    const { data, error } = await client
+                        .from('records')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+                    if (data) this.records = data;
+                },
+
+                // 实时监听 (Supabase v2 写法)
+                initRealtime() {
+                    client.channel('public:records')
+                        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'records' }, payload => {
+                            this.records.unshift(payload.new);
+                        })
+                        .subscribe();
+                },
+
+                // 发送文字
+                async sendText() {
+                    if (!this.inputText.trim()) return;
+                    this.loading = true;
+                    await client.from('records').insert({ type: 'text', content: this.inputText });
+                    this.inputText = '';
+                    this.loading = false;
+                },
+
+                // 上传文件逻辑
+                triggerFile() { this.$refs.fileInput.click(); },
+                async handleFile(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    this.loading = true;
+
+                    try {
+                        const fileExt = file.name.split('.').pop();
+                        const fileName = `${Date.now()}.${fileExt}`;
+                        
+                        // 1. 上传文件到 Storage Bucket 'files'
+                        const { data, error } = await client.storage
+                            .from('files')
+                            .upload(fileName, file);
+
+                        if (error) throw error;
+
+                        // 2. 获取公开访问链接
+                        const { data: { publicUrl } } = client.storage
+                            .from('files')
+                            .getPublicUrl(fileName);
+
+                        // 3. 存入数据库
+                        const type = file.type.startsWith('image') ? 'image' : 'audio';
+                        await client.from('records').insert({ type, content: publicUrl });
+                    } catch (err) {
+                        alert('上传出错: ' + err.message);
+                    } finally {
+                        e.target.value = ''; // 重置input
+                        this.loading = false;
+                    }
+                },
+
+                // 导出 Word
+                async generateWord() {
+                    const { Document, Packer, Paragraph, TextRun } = docx;
+                    const children = [
+                        new Paragraph({ children: [new TextRun({ text: "工作周报", bold: true, size: 40 })] }),
+                        new Paragraph({ text: "------------------------" })
+                    ];
+
+                    // 遍历记录生成文档
+                    this.records.forEach(item => {
+                        const timeStr = this.formatTime(item.created_at);
+                        children.push(new Paragraph({ 
+                            children: [new TextRun({ text: `【${timeStr}】`, bold: true, color: "666666" })] 
+                        }));
+
+                        if (item.type === 'text') {
+                            children.push(new Paragraph({ text: item.content }));
+                        } else {
+                            // 附件形式展示链接
+                            const label = item.type === 'image' ? '[图片附件]' : '[语音附件]';
+                            children.push(new Paragraph({ text: `${label}: ${item.content}` }));
+                        }
+                        children.push(new Paragraph({ text: "" })); // 空行
+                    });
+
+                    const doc = new Document({ sections: [{ children }] });
+                    
+                    Packer.toBlob(doc).then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `周报_${new Date().toISOString().slice(0,10)}.docx`;
+                        a.click();
+                    });
+                },
+
+                // 客户端辅助清理 (双重保险，每次刷新页面都检查并删除7天前的数据)
+                async cleanupOldData() {
+                    const sevenDaysAgo = new Date();
+                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                    await client.from('records').delete().lt('created_at', sevenDaysAgo.toISOString());
+                },
+
+                formatTime(isoStr) {
+                    return new Date(isoStr).toLocaleString('zh-CN', { 
+                        month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>
