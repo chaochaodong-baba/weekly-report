@@ -1,43 +1,95 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <!-- 应用图标和启动配置 -->
-    <link rel="manifest" href="manifest.json" />
-    <!-- 主题颜色 -->
-    <meta name="theme-color" content="#3367D6" />
-    
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>实验室协作助手</title>
     <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/docx@7.1.0/build/index.js"></script>
-
+    
     <style>
         /* 基础样式 */
         body { margin:0; padding:0; background:#f0f2f5; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:#333; }
         .container { max-width:600px; margin:0 auto; padding:15px; padding-bottom:100px; }
-        /* 省略… 保持你原来的所有样式不变 */
-        /* 这里可以全部复制你原来的<style>内容 */
-        /* 你原来的样式代码请按需复制粘贴 */
+        
+        /* 登录 */
+        .login-box { background:#fff; padding:40px 30px; border-radius:16px; margin-top:60px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.08); }
+        .login-title { font-size:26px; font-weight:800; color:#2c3e50; margin-bottom:10px; }
+        .login-input { width:100%; padding:15px; margin-bottom:15px; border:1px solid #e1e4e8; border-radius:10px; box-sizing:border-box; font-size:16px; background:#f9f9f9; outline:none; transition:0.3s; }
+        .login-input:focus { background:#fff; border-color:#3ecf8e; }
+        .btn-auth { width:100%; padding:15px; background:#3ecf8e; color:#fff; border:none; border-radius:10px; font-weight:700; font-size:16px; cursor:pointer; }
+        
+        /* 吸顶栏 */
+        .sticky-header { position:sticky; top:0; z-index:100; background:rgba(240,242,245,0.95); backdrop-filter:blur(10px); padding:10px 0; margin-bottom:10px; border-bottom:1px solid rgba(0,0,0,0.05); }
+        .header-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+        .user-tag { font-size:18px; font-weight:800; color:#2c3e50; }
+        .role-badge { background:#ff9f43; color:#fff; padding:2px 8px; border-radius:6px; font-size:11px; margin-left:6px; vertical-align:middle; }
+        
+        /* 筛选工具 */
+        .filter-card { background:#fff; padding:12px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.05); border:1px solid #e1e4e8; }
+        .filter-row { display:flex; gap:8px; margin-bottom:8px; align-items:center; }
+        .date-input { flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:13px; background:#f9f9f9; text-align:center; font-family:inherit; }
+        .user-select { width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; background:#fff; font-size:14px; margin-bottom:8px; }
+        .btn-export { width:100%; background:#2c3e50; color:#fff; border:none; padding:10px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; display:flex; justify-content:center; align-items:center; gap:5px; }
+
+        /* 输入区 */
+        .input-card { background:#fff; padding:15px; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.03); margin-bottom:20px; }
+        textarea { width:100%; border:none; height:80px; resize:none; font-size:16px; outline:none; font-family:inherit; }
+        .action-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:10px; border-top:1px solid #f0f0f0; padding-top:10px; }
+        .btn-tool { display:flex; flex-direction:column; align-items:center; background:#f8f9fa; border-radius:10px; padding:10px 0; color:#666; font-size:12px; font-weight:600; cursor:pointer; }
+        .btn-submit { background:#3ecf8e; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:700; width:100%; margin-top:15px; font-size:15px; cursor:pointer; }
+        .recording-state { background:#fff2f0; color:#ff4d4f; animation:pulse 1.5s infinite; }
+
+        /* 分组与列表 */
+        .group-section { margin-bottom:25px; }
+        .group-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+        .group-title { font-size:16px; font-weight:700; color:#333; padding-left:8px; border-left:4px solid #3ecf8e; }
+        .group-count { font-size:12px; background:#e1e4e8; color:#555; padding:2px 8px; border-radius:10px; }
+        
+        .list-item { background:#fff; padding:15px; border-radius:12px; margin-bottom:15px; box-shadow:0 2px 8px rgba(0,0,0,0.03); border:1px solid rgba(0,0,0,0.02); transition: all 0.3s; }
+        .list-item.unread-highlight { border: 1.5px solid #ff4d4f; background: #fffcfc; } /* 未读高亮 */
+        
+        .item-meta { display:flex; justify-content:space-between; font-size:12px; color:#999; margin-bottom:8px; align-items:center; }
+        .unread-badge { background:#ff4d4f; color:white; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:bold; animation: pulse 2s infinite; }
+        
+        .item-content { font-size:15px; line-height:1.6; color:#333; white-space:pre-wrap; }
+        .item-img { max-width:100%; border-radius:8px; margin-top:10px; border:1px solid #eee; display:block; }
+
+        /* 评论区样式 */
+        .comment-section { margin-top:15px; padding-top:15px; border-top:1px dashed #eee; }
+        .comment-list { background:#f9f9f9; border-radius:8px; padding:10px; margin-bottom:10px; }
+        .comment-row { margin-bottom:8px; font-size:13px; line-height:1.4; }
+        .comment-row:last-child { margin-bottom:0; }
+        .comment-user { font-weight:bold; color:#555; }
+        .comment-user.is-leader { color:#d35400; } /* 领导评论名字颜色 */
+        .comment-time { font-size:11px; color:#aaa; margin-left:5px; }
+        
+        .comment-input-row { display:flex; gap:8px; }
+        .comment-input { flex:1; border:1px solid #ddd; border-radius:6px; padding:8px; font-size:13px; outline:none; }
+        .btn-reply { background:#333; color:#fff; border:none; border-radius:6px; padding:0 12px; font-size:13px; font-weight:bold; cursor:pointer; }
+        
+        .btn-read { width:100%; background:#e6f7ff; color:#1890ff; border:1px solid #91d5ff; padding:8px; border-radius:6px; margin-top:10px; font-size:13px; font-weight:bold; cursor:pointer; }
+
+        @keyframes pulse { 0% { opacity:1; } 50% { opacity:0.6; } 100% { opacity:1; } }
+        .loading-mask { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index:999; display:flex; justify-content:center; align-items:center; flex-direction:column; }
     </style>
 </head>
 <body>
     <div id="app" class="container">
-        <!-- 你原本的页面内容全部保持不变 -->
-        <!-- 这里复制粘贴你原来的<body>里面全部内容 -->
         
         <!-- 登录页 -->
         <div v-if="!user" class="login-box">
             <div class="login-title">🧪 实验室协作助手</div>
             <div style="color:#999; margin-bottom:30px;">请输入姓名拼音登录</div>
-            <input v-model="username" class="login-input" placeholder="姓名拼音 (如: lihua)" autocapitalize="off" autocorrect="off" />
-            <input v-model="password" type="password" class="login-input" placeholder="密码 (默认建议: 123456)" />
+            <input v-model="username" class="login-input" placeholder="姓名拼音 (如: lihua)" autocapitalize="off" autocorrect="off">
+            <input v-model="password" type="password" class="login-input" placeholder="密码 (默认建议: 123456)">
             <button class="btn-auth" @click="handleLogin">进入系统</button>
         </div>
 
         <!-- 主界面 -->
         <div v-else>
+            
             <!-- 顶部栏 -->
             <div class="sticky-header">
                 <div class="header-row">
@@ -53,9 +105,9 @@
                     
                     <div class="filter-row">
                         <span style="font-size:12px; font-weight:bold; color:#666;">📅 日期</span>
-                        <input type="date" v-model="startDate" class="date-input" />
+                        <input type="date" v-model="startDate" class="date-input">
                         <span style="color:#ccc;">-</span>
-                        <input type="date" v-model="endDate" class="date-input" />
+                        <input type="date" v-model="endDate" class="date-input">
                     </div>
                     
                     <button class="btn-export" @click="generateWord">
@@ -75,8 +127,8 @@
                     <div class="btn-tool" @click="$refs.gal.click()"><span>🖼️</span>相册</div>
                 </div>
                 <button class="btn-submit" @click="sendText">提交记录</button>
-                <input type="file" ref="cam" accept="image/*" capture="environment" style="display:none" @change="handleFile" />
-                <input type="file" ref="gal" accept="image/*" style="display:none" @change="handleFile" />
+                <input type="file" ref="cam" accept="image/*" capture="environment" style="display:none" @change="handleFile">
+                <input type="file" ref="gal" accept="image/*" style="display:none" @change="handleFile">
             </div>
 
             <!-- 列表展示 -->
@@ -105,7 +157,7 @@
                         </div>
                         
                         <div v-if="item.type==='text'" class="item-content">{{ item.content }}</div>
-                        <div v-if="item.type==='image'"><img :src="item.content" class="item-img" loading="lazy" onclick="window.open(this.src)" /></div>
+                        <div v-if="item.type==='image'"><img :src="item.content" class="item-img" loading="lazy" onclick="window.open(this.src)"></div>
 
                         <!-- 评论区 -->
                         <div class="comment-section">
@@ -121,7 +173,7 @@
 
                             <!-- 操作区 -->
                             <div class="comment-input-row">
-                                <input type="text" class="comment-input" v-model="item.tempComment" placeholder="写评论/回复..." />
+                                <input type="text" class="comment-input" v-model="item.tempComment" placeholder="写评论/回复...">
                                 <button class="btn-reply" @click="sendComment(item)">发送</button>
                             </div>
 
@@ -145,17 +197,6 @@
     </div>
 
     <script>
-        // PWA Service Worker 注册
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').then(() => {
-                    console.log('ServiceWorker 注册成功');
-                }).catch(() => {
-                    console.log('ServiceWorker 注册失败');
-                });
-            });
-        }
-
         // ============================================================
         // 🚀 配置区域
         // ============================================================
@@ -387,6 +428,9 @@
                             }));
                             if(i.type==='text') children.push(new Paragraph({ text:i.content }));
                             else children.push(new Paragraph({ text:`[图片附件]: ${i.content}`, color:"0000FF" }));
+                            
+                            // 导出时是否带评论？这里暂不带，保持报告整洁。如果需要可以加。
+                            
                             children.push(new Paragraph({ text:"" }));
                         });
                     });
