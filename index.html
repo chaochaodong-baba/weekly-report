@@ -4,147 +4,188 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>实验室记录助手</title>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- ✅ 关键修改：使用国内高速 CDN，解决加载卡顿问题 -->
+    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docx@7.1.0/build/index.js"></script>
+    
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 0; margin: 0; color: #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f2f4f8; margin: 0; padding: 0; color: #333; -webkit-tap-highlight-color: transparent; }
         .container { max-width: 600px; margin: 0 auto; padding: 15px; padding-bottom: 80px; }
         
-        /* 登录页样式优化 */
-        .login-box { background: white; padding: 30px; border-radius: 12px; margin-top: 50px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .login-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; outline: none; transition: border 0.3s; }
-        .login-input:focus { border-color: #3ecf8e; }
-        .btn-auth { width: 100%; padding: 12px; background: #3ecf8e; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        /* 登录框样式 */
+        .login-box { background: white; padding: 40px 25px; border-radius: 16px; margin-top: 60px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+        .login-title { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 10px; }
+        .login-subtitle { font-size: 14px; color: #888; margin-bottom: 30px; }
+        .login-input { width: 100%; padding: 14px; margin-bottom: 15px; border: 1px solid #eee; border-radius: 10px; box-sizing: border-box; font-size: 16px; background: #fafafa; transition: all 0.3s; outline: none; }
+        .login-input:focus { background: white; border-color: #3ecf8e; box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.1); }
+        .btn-auth { width: 100%; padding: 14px; background: #3ecf8e; color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; margin-top: 10px; cursor: pointer; transition: opacity 0.2s; }
+        .btn-auth:active { opacity: 0.8; }
         
-        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 15px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .user-info { font-size: 16px; font-weight: bold; color: #333; }
-        .btn-logout { font-size: 12px; color: #999; cursor: pointer; text-decoration: underline; }
+        /* 主界面样式 */
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px; margin-bottom: 15px; }
+        .user-tag { font-size: 18px; font-weight: 700; color: #2c3e50; }
+        .role-badge { background: #ff9f43; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; vertical-align: middle; margin-left: 5px; }
+        .btn-logout { font-size: 14px; color: #999; text-decoration: underline; cursor: pointer; }
 
-        textarea { width: 100%; border: 1px solid #eee; border-radius: 8px; padding: 10px; height: 100px; resize: none; font-size: 16px; box-sizing: border-box; }
-        textarea:focus { outline: none; border-color: #3ecf8e; }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); margin-bottom: 20px; }
         
-        .action-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
-        .btn { padding: 12px 0; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; color: white; font-size: 14px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-        .btn-send { background: #3ecf8e; grid-column: span 3; margin-top: 10px; } 
+        textarea { width: 100%; border: none; padding: 0; height: 100px; resize: none; font-size: 16px; box-sizing: border-box; outline: none; font-family: inherit; color: #333; }
+        textarea::placeholder { color: #ccc; }
         
-        .btn-tool { background: #f9f9f9; color: #555; border: 1px solid #eee; }
-        .btn-tool.recording { background: #ff4d4f; color: white; animation: pulse 1s infinite; border: none; }
+        .divider { height: 1px; background: #eee; margin: 10px 0; }
         
-        /* 列表样式 */
-        .filter-bar { margin-bottom: 10px; }
-        .filter-select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; background: white; font-size: 14px; }
-        .list-item { padding: 15px 0; border-bottom: 1px solid #f0f0f0; }
-        .meta { display: flex; justify-content: space-between; font-size: 12px; color: #999; margin-bottom: 6px; }
-        .sender-tag { background: #e6f7ff; color: #1890ff; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
-        .content { font-size: 16px; line-height: 1.6; white-space: pre-wrap; color: #333; }
-        img { max-width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid #f0f0f0; }
+        /* 按钮组 */
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .btn-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8f9fa; border: 1px solid #eee; border-radius: 10px; padding: 12px 0; color: #555; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        .btn-tool:active { background: #eee; }
+        .btn-tool span { font-size: 22px; margin-bottom: 4px; display: block; }
+        
+        /* 录音中状态 */
+        .recording-state { background: #fff1f0; border-color: #ffccc7; color: #ff4d4f; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(255, 77, 79, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0); } }
 
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+        .btn-submit { background: #3ecf8e; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: bold; font-size: 15px; width: 100%; margin-top: 15px; cursor: pointer; }
+        
+        /* 列表和筛选 */
+        .filter-select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; background: white; font-size: 14px; margin-bottom: 15px; -webkit-appearance: none; }
+        
+        .list-item { background: white; padding: 15px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .item-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: #999; }
+        .name-label { background: #e6f7ff; color: #1890ff; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+        .item-content { font-size: 16px; line-height: 1.6; color: #333; white-space: pre-wrap; }
+        .item-img { max-width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid #eee; display: block; }
+
+        /* 加载遮罩 */
+        .loading-mask { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3ecf8e; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div id="app" class="container">
         
-        <!-- 1. 登录界面 (改为了输入姓名拼音) -->
+        <!-- ================= 登录界面 ================= -->
         <div v-if="!user" class="login-box">
-            <h2 style="margin-top:0; color:#333;">🧪 实验室记录</h2>
-            <p style="color:#666; font-size:14px; margin-bottom:20px;">请输入名字拼音登录</p>
+            <div class="login-title">🧪 实验室记录助手</div>
+            <div class="login-subtitle">请输入您的姓名拼音登录</div>
             
-            <input v-model="username" type="text" class="login-input" placeholder="姓名拼音 (如: lihua)" autocapitalize="off">
-            <input v-model="password" type="password" class="login-input" placeholder="密码 (建议统一设置, 如 123456)">
+            <input v-model="username" type="text" class="login-input" placeholder="姓名拼音 (如: lihua)" autocapitalize="off" autocorrect="off">
+            <input v-model="password" type="password" class="login-input" placeholder="密码 (默认建议: 123456)">
             
-            <button class="btn-auth" @click="handleLogin" :disabled="loading">{{ loading ? '登录中...' : '进入系统' }}</button>
-            <p style="font-size:12px; color:#aaa; margin-top:15px;">首次登录将自动注册</p>
+            <button class="btn-auth" @click="handleLogin">进入系统</button>
+            <div style="margin-top: 20px; font-size: 12px; color: #aaa;">首次登录将自动为您注册账号</div>
         </div>
 
-        <!-- 2. 主界面 -->
+        <!-- ================= 主界面 ================= -->
         <div v-else>
-            <!-- 顶部信息 -->
+            <!-- 顶部栏 -->
             <div class="header">
-                <div class="user-info">
-                    👋 你好, {{ formatName(user.email) }} 
-                    <span v-if="isLeader" style="background:#ff9500; color:white; padding:2px 6px; border-radius:4px; font-size:12px; margin-left:5px;">管理员</span>
+                <div class="user-tag">
+                    Hi, {{ formatName(user.email) }}
+                    <span v-if="isLeader" class="role-badge">管理员</span>
                 </div>
-                <span class="btn-logout" @click="signOut">退出</span>
+                <div class="btn-logout" @click="signOut">退出</div>
             </div>
 
-            <!-- 记录输入区 -->
+            <!-- 输入卡片 -->
             <div class="card">
-                <textarea v-model="inputText" placeholder="点击下方话筒说话，或直接打字..."></textarea>
+                <textarea v-model="inputText" placeholder="点击下方「语音输入」开始说话，或直接打字..."></textarea>
+                <div class="divider"></div>
                 
-                <div class="action-bar">
-                    <button class="btn btn-tool" :class="{ recording: isRecording }" @click="toggleSpeech">
-                        <span style="font-size:20px;">{{ isRecording ? '⏹️' : '🎤' }}</span>
-                        {{ isRecording ? '停止' : '语音输入' }}
-                    </button>
-                    <button class="btn btn-tool" @click="$refs.cameraInput.click()">
-                        <span style="font-size:20px;">📷</span> 拍照
-                    </button>
-                    <button class="btn btn-tool" @click="$refs.galleryInput.click()">
-                        <span style="font-size:20px;">🖼️</span> 相册
-                    </button>
-                    <!-- 提交按钮 -->
-                    <button class="btn btn-send" @click="sendText">提交记录</button>
+                <div class="action-grid">
+                    <!-- 语音按钮 -->
+                    <div class="btn-tool" :class="{ 'recording-state': isRecording }" @click="toggleSpeech">
+                        <span>{{ isRecording ? '⏹️' : '🎤' }}</span>
+                        {{ isRecording ? '停止说话' : '语音输入' }}
+                    </div>
+                    
+                    <!-- 拍照按钮 -->
+                    <div class="btn-tool" @click="$refs.cameraInput.click()">
+                        <span>📷</span> 拍照
+                    </div>
+                    
+                    <!-- 相册按钮 -->
+                    <div class="btn-tool" @click="$refs.galleryInput.click()">
+                        <span>🖼️</span> 相册
+                    </div>
                 </div>
+
+                <button class="btn-submit" @click="sendText">提交记录</button>
                 
+                <!-- 隐藏的文件控件 -->
                 <input type="file" ref="cameraInput" accept="image/*" capture="environment" style="display:none" @change="handleFile">
                 <input type="file" ref="galleryInput" accept="image/*" style="display:none" @change="handleFile">
             </div>
 
-            <!-- 领导筛选区 -->
-            <div v-if="isLeader" class="filter-bar">
+            <!-- 管理员筛选栏 -->
+            <div v-if="isLeader">
                 <select v-model="selectedUserFilter" class="filter-select">
-                    <option value="all">📁 查看所有人的记录</option>
+                    <option value="all">📂 查看所有组员的记录</option>
                     <option v-for="u in uniqueUsers" :value="u">👤 只看 {{ formatName(u) }}</option>
                 </select>
+                
+                <!-- 导出按钮仅管理员或需要时显示 -->
+                <button @click="generateWord" style="width:100%; background:#333; color:white; border:none; padding:12px; border-radius:8px; margin-bottom:20px; font-weight:bold;">
+                    📤 导出当前记录 (Word)
+                </button>
+            </div>
+            
+            <!-- 普通用户导出按钮 -->
+            <div v-else style="margin-bottom:20px;">
+                <button @click="generateWord" style="width:100%; background:#333; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">
+                    📤 导出我的记录 (Word)
+                </button>
             </div>
 
-            <!-- 导出按钮 -->
-            <button class="btn btn-send" style="background:#333; margin-bottom:20px;" @click="generateWord">
-                📤 导出当前记录 (Word)
-            </button>
-
-            <!-- 记录列表 -->
-            <div class="list">
-                <div v-if="filteredRecords.length === 0" style="text-align:center; color:#ccc; padding:30px;">
-                    今天还没有记录哦
+            <!-- 列表展示 -->
+            <div class="list-container">
+                <div v-if="filteredRecords.length === 0" style="text-align:center; padding: 40px; color: #ccc;">
+                    <div style="font-size: 40px; margin-bottom: 10px;">📭</div>
+                    暂时没有记录
                 </div>
+
                 <div v-for="item in filteredRecords" :key="item.id" class="list-item">
-                    <div class="meta">
-                        <span class="sender-tag">{{ formatName(item.email) }}</span>
+                    <div class="item-header">
+                        <span class="name-label">{{ formatName(item.email) }}</span>
                         <span>{{ formatTime(item.created_at) }}</span>
                     </div>
                     
-                    <div v-if="item.type === 'text'" class="content">{{ item.content }}</div>
+                    <!-- 文字内容 -->
+                    <div v-if="item.type === 'text'" class="item-content">{{ item.content }}</div>
                     
+                    <!-- 图片内容 -->
                     <div v-if="item.type === 'image'">
-                        <img :src="item.content" loading="lazy" onclick="window.open(this.src)">
+                        <img :src="item.content" class="item-img" loading="lazy" onclick="window.open(this.src)">
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- 加载遮罩 -->
-        <div v-if="loading" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); display:flex; justify-content:center; align-items:center; z-index:999; flex-direction:column;">
-            <div style="font-size:30px; margin-bottom:10px;">🔄</div>
-            <div style="color:#666;">处理中...</div>
+        <!-- 全局加载动画 -->
+        <div v-if="loading" class="loading-mask">
+            <div class="spinner"></div>
+            <div style="color: #666; font-size: 14px;">处理中...</div>
         </div>
+
     </div>
 
     <script>
         const { createClient } = supabase;
 
         // ============================================================
-        // ⚠️ 配置区域 (修改这里)
+        // 👇👇👇 只需要改这里 👇👇👇
         // ============================================================
+        
+        // 1. 填入你的 Supabase URL
         const SUPABASE_URL = 'https://你的项目ID.supabase.co'; 
+        
+        // 2. 填入你的 Anon Key
         const SUPABASE_KEY = '你的anon_key'; 
         
-        // ⚠️ 领导账号的拼音 (自动加上 @lab.com)
-        // 比如你叫王伟，就写 'wangwei@lab.com'
-        const LEADER_EMAIL = 'boss@lab.com'; 
+        // 3. 你的管理员拼音账号 (已预设好)
+        const LEADER_EMAIL = 'dongchao@lab.com';
+        
         // ============================================================
 
         const client = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -153,7 +194,7 @@
             data() {
                 return {
                     user: null,
-                    username: '', // 用户输入的拼音
+                    username: '',
                     password: '',
                     inputText: '',
                     records: [],
@@ -165,147 +206,217 @@
                 }
             },
             computed: {
+                // 提取所有发过记录的人
                 uniqueUsers() {
                     return Array.from(new Set(this.records.map(r => r.email)));
                 },
+                // 筛选逻辑
                 filteredRecords() {
                     if (this.selectedUserFilter === 'all') return this.records;
                     return this.records.filter(r => r.email === this.selectedUserFilter);
                 }
             },
             async mounted() {
+                // 1. 恢复登录状态
                 const { data: { session } } = await client.auth.getSession();
                 if (session) {
                     this.setUser(session.user);
                     this.loadRecords();
                 }
+
+                // 2. 监听登录变化
                 client.auth.onAuthStateChange((_event, session) => {
                     this.setUser(session ? session.user : null);
                     if (session) this.loadRecords();
                 });
+
+                // 3. 初始化语音识别
                 this.initSpeech();
             },
             methods: {
-                // 辅助函数：把 'lihua@lab.com' 显示为 'lihua'
+                // 格式化名字显示 (去掉 @lab.com)
                 formatName(email) {
-                    return email ? email.split('@')[0] : '';
+                    return email ? email.split('@')[0] : '未知用户';
                 },
+                
                 setUser(u) {
                     this.user = u;
                     if (u) {
-                        // 判断是否为领导
-                        this.isLeader = (u.email === dongchao@lab.com);
+                        this.isLeader = (u.email === LEADER_EMAIL);
                     }
                 },
-                // 登录逻辑修改
+
+                // 登录/注册逻辑
                 async handleLogin() {
-                    if (!this.username || !this.password) return alert('请输入名字拼音和密码');
+                    if (!this.username || !this.password) return alert('请输入姓名拼音和密码');
                     this.loading = true;
                     
                     // 自动拼接后缀
-                    const email = this.username.toLowerCase() + '@lab.com';
+                    const email = this.username.toLowerCase().trim() + '@lab.com';
                     
+                    // 先尝试登录
                     let { error } = await client.auth.signInWithPassword({ email, password: this.password });
+                    
                     if (error) {
-                        // 登录失败则尝试注册
-                        const { error: signUpError } = await client.auth.signUp({ email, password: this.password });
-                        if (signUpError) alert('登录/注册失败: ' + signUpError.message);
-                        else alert('新用户注册成功！已为您自动登录。');
+                        // 登录失败尝试注册
+                        if (error.message.includes('Invalid login') || error.message.includes('not found')) {
+                            const { error: signUpError } = await client.auth.signUp({ email, password: this.password });
+                            if (signUpError) alert('注册失败: ' + signUpError.message);
+                            else alert('新账号注册成功！已为您自动登录。');
+                        } else {
+                            alert('登录错误: ' + error.message);
+                        }
                     }
                     this.loading = false;
                 },
+
                 async signOut() {
                     await client.auth.signOut();
                     this.records = [];
                     this.username = '';
                     this.password = '';
                 },
+
+                // 加载数据 + 实时监听
                 async loadRecords() {
                     const { data } = await client.from('records').select('*').order('created_at', { ascending: false });
                     if (data) this.records = data;
                     
                     client.channel('public:records')
                         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'records' }, payload => {
+                            // 逻辑：如果是领导，或者这条消息属于当前用户，就显示
                             if (this.isLeader || payload.new.user_id === this.user.id) {
                                 this.records.unshift(payload.new);
                             }
                         }).subscribe();
                 },
+
+                // 语音识别初始化
                 initSpeech() {
                     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
                         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                         this.recognition = new SpeechRecognition();
-                        this.recognition.lang = 'zh-CN'; 
-                        this.recognition.continuous = true; 
-                        this.recognition.interimResults = true; 
+                        this.recognition.lang = 'zh-CN';
+                        this.recognition.continuous = true;
+                        this.recognition.interimResults = true;
 
                         this.recognition.onresult = (event) => {
                             let finalTranscript = '';
                             for (let i = event.resultIndex; i < event.results.length; ++i) {
                                 if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
                             }
-                            if (finalTranscript) this.inputText += (this.inputText ? ' ' : '') + finalTranscript;
+                            if (finalTranscript) {
+                                this.inputText += (this.inputText ? '，' : '') + finalTranscript;
+                            }
                         };
                         this.recognition.onend = () => { this.isRecording = false; };
                         this.recognition.onerror = () => { this.isRecording = false; };
                     }
                 },
+
                 toggleSpeech() {
-                    if (!this.recognition) return alert('请使用 Chrome 或 Safari 浏览器');
-                    if (this.isRecording) this.recognition.stop();
-                    else { this.recognition.start(); this.isRecording = true; }
+                    if (!this.recognition) return alert('您的浏览器不支持语音转文字，请尝试使用 Chrome 或 Safari');
+                    if (this.isRecording) {
+                        this.recognition.stop();
+                    } else {
+                        this.recognition.start();
+                        this.isRecording = true;
+                    }
                 },
+
+                // 发送纯文本
                 async sendText() {
                     if (!this.inputText.trim()) return;
                     this.loading = true;
-                    await client.from('records').insert({
+                    const { error } = await client.from('records').insert({
                         user_id: this.user.id,
                         email: this.user.email,
                         type: 'text',
                         content: this.inputText
                     });
-                    this.inputText = '';
+                    if (error) alert('发送失败: ' + error.message);
+                    else this.inputText = '';
                     this.loading = false;
                 },
+
+                // 上传图片
                 async handleFile(e) {
                     const file = e.target.files[0];
                     if (!file) return;
+                    
+                    // 简单的图片压缩检查（可选，这里不做深度压缩逻辑，直接上传）
                     this.loading = true;
                     try {
-                        const fileName = `${Date.now()}_${this.formatName(this.user.email)}`;
-                        const { error } = await client.storage.from('files').upload(fileName, file);
-                        if (error) throw error;
+                        const fileExt = file.name.split('.').pop();
+                        // 文件名：时间戳_拼音.jpg
+                        const fileName = `${Date.now()}_${this.formatName(this.user.email)}.${fileExt}`;
+                        
+                        // 1. 上传到 Storage
+                        const { error: uploadError } = await client.storage.from('files').upload(fileName, file);
+                        if (uploadError) throw uploadError;
+                        
+                        // 2. 获取链接
                         const { data } = client.storage.from('files').getPublicUrl(fileName);
+                        
+                        // 3. 写入数据库
                         await client.from('records').insert({
                             user_id: this.user.id,
                             email: this.user.email,
                             type: 'image',
                             content: data.publicUrl
                         });
-                    } catch (err) { alert('上传失败'); } 
-                    finally { this.loading = false; e.target.value = ''; }
+                    } catch (err) {
+                        alert('图片上传失败，请检查网络');
+                        console.error(err);
+                    } finally {
+                        this.loading = false;
+                        e.target.value = ''; // 重置input
+                    }
                 },
+
+                // 生成 Word
                 async generateWord() {
                     const { Document, Packer, Paragraph, TextRun } = docx;
                     const children = [
-                        new Paragraph({ children: [new TextRun({ text: "实验记录汇总", bold: true, size: 40 })] }),
-                        new Paragraph({ text: "------------------------" })
+                        new Paragraph({ children: [new TextRun({ text: "实验室记录汇总", bold: true, size: 48 })] }),
+                        new Paragraph({ text: "------------------------------------------------" }),
+                        new Paragraph({ text: "" })
                     ];
+
+                    // 使用当前页面展示的 filteredRecords 来生成
                     this.filteredRecords.forEach(item => {
                         const name = this.formatName(item.email);
+                        const time = this.formatTime(item.created_at);
+                        
+                        // 标题行：【姓名】 时间
                         children.push(new Paragraph({ 
-                            children: [new TextRun({ text: `【${name}】 ${this.formatTime(item.created_at)}`, bold: true, color: "666666" })] 
+                            children: [new TextRun({ text: `【${name}】 ${time}`, bold: true, color: "444444", size: 24 })] 
                         }));
-                        if (item.type === 'text') children.push(new Paragraph({ text: item.content }));
-                        else children.push(new Paragraph({ text: `[图片附件]: ${item.content}` }));
+
+                        // 内容行
+                        if (item.type === 'text') {
+                            children.push(new Paragraph({ text: item.content, size: 24 }));
+                        } else {
+                            children.push(new Paragraph({ text: `[图片附件]: ${item.content}`, color: "0000FF" }));
+                        }
+                        children.push(new Paragraph({ text: "" })); // 空行
+                        children.push(new Paragraph({ text: "------------------" })); // 分隔线
                         children.push(new Paragraph({ text: "" }));
                     });
-                    const blob = await Packer.toBlob(new Document({ sections: [{ children }] }));
-                    const a = document.createElement("a");
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `记录_${new Date().toISOString().slice(0,10)}.docx`;
-                    a.click();
+
+                    const doc = new Document({ sections: [{ children }] });
+                    
+                    Packer.toBlob(doc).then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        // 文件名：记录_日期.docx
+                        a.download = `实验记录_${new Date().toISOString().slice(0,10)}.docx`;
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                    });
                 },
+
                 formatTime(str) {
                     return new Date(str).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
                 }
