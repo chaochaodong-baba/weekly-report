@@ -3,57 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>实验室记录助手</title>
-    <!-- 使用国内高速镜像，解决加载慢的问题 -->
+    <title>实验室记录助手 Pro+</title>
+    <!-- 使用国内高速镜像 -->
     <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/docx@7.1.0/build/index.js"></script>
     
     <style>
-        /* 基础样式 */
-        body { margin:0; padding:0; background:#f5f7fa; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:#333; -webkit-tap-highlight-color:transparent; }
-        .container { max-width:600px; margin:0 auto; padding:20px; padding-bottom:100px; }
+        /* ============ 样式定义 ============ */
+        body { margin:0; padding:0; background:#f0f2f5; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:#333; -webkit-tap-highlight-color:transparent; }
+        .container { max-width:600px; margin:0 auto; padding:15px; padding-bottom:100px; }
         
-        /* 登录页 */
+        /* 登录 */
         .login-box { background:#fff; padding:40px 30px; border-radius:16px; margin-top:60px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,0.08); }
         .login-title { font-size:26px; font-weight:800; color:#2c3e50; margin-bottom:10px; }
-        .login-input { width:100%; padding:15px; margin-bottom:15px; border:1px solid #e1e4e8; border-radius:10px; box-sizing:border-box; font-size:16px; background:#f9f9f9; transition:0.3s; outline:none; }
-        .login-input:focus { background:#fff; border-color:#3ecf8e; box-shadow:0 0 0 3px rgba(62,207,142,0.1); }
-        .btn-auth { width:100%; padding:15px; background:#3ecf8e; color:#fff; border:none; border-radius:10px; font-weight:700; font-size:16px; cursor:pointer; box-shadow:0 4px 15px rgba(62,207,142,0.3); }
-        .btn-auth:active { transform:scale(0.98); }
+        .login-input { width:100%; padding:15px; margin-bottom:15px; border:1px solid #e1e4e8; border-radius:10px; box-sizing:border-box; font-size:16px; background:#f9f9f9; outline:none; transition:0.3s; }
+        .login-input:focus { background:#fff; border-color:#3ecf8e; }
+        .btn-auth { width:100%; padding:15px; background:#3ecf8e; color:#fff; border:none; border-radius:10px; font-weight:700; font-size:16px; cursor:pointer; }
         
-        /* 顶部栏 */
-        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
-        .user-tag { font-size:18px; font-weight:700; color:#34495e; }
-        .role-badge { background:#ff9f43; color:#fff; padding:3px 8px; border-radius:6px; font-size:12px; margin-left:6px; vertical-align:middle; }
-        .btn-logout { font-size:14px; color:#999; cursor:pointer; padding:5px; text-decoration: underline; }
+        /* 顶部吸顶栏 */
+        .sticky-header { position:sticky; top:0; z-index:100; background:rgba(240,242,245,0.95); backdrop-filter:blur(10px); padding:10px 0; margin-bottom:10px; }
+        .header-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+        .user-tag { font-size:18px; font-weight:800; color:#2c3e50; }
+        .role-badge { background:#ff9f43; color:#fff; padding:2px 8px; border-radius:6px; font-size:11px; margin-left:6px; vertical-align:middle; }
+        
+        /* 筛选工具 */
+        .filter-card { background:#fff; padding:12px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.05); border:1px solid #e1e4e8; }
+        .filter-label { font-size:12px; color:#999; margin-bottom:5px; font-weight:bold; }
+        .date-row { display:flex; gap:8px; align-items:center; }
+        .date-input { flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-size:13px; background:#f9f9f9; text-align:center; font-family:inherit; }
+        .user-select { width:100%; padding:8px; border:1px solid #ddd; border-radius:8px; background:#fff; font-size:14px; margin-bottom:8px; }
+        .btn-export { width:100%; background:#2c3e50; color:#fff; border:none; padding:10px; border-radius:8px; font-weight:600; font-size:13px; cursor:pointer; margin-top:8px; display:flex; justify-content:center; align-items:center; gap:5px; }
 
-        /* 输入卡片 */
-        .card { background:#fff; padding:20px; border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,0.04); margin-bottom:25px; }
-        textarea { width:100%; border:none; height:100px; resize:none; font-size:16px; outline:none; font-family:inherit; color:#333; }
-        
-        /* 功能按钮网格 */
-        .action-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:20px; border-top:1px solid #f0f0f0; padding-top:20px; }
-        .btn-tool { display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f8f9fa; border:1px solid #eee; border-radius:12px; padding:15px 0; color:#666; font-size:13px; font-weight:600; cursor:pointer; transition:0.2s; }
-        .btn-tool:active { background:#eee; }
-        .btn-tool span { font-size:24px; margin-bottom:5px; }
-        .recording-state { background:#fff2f0; border-color:#ffccc7; color:#ff4d4f; animation:pulse 1.5s infinite; }
-        
-        .btn-submit { background:#3ecf8e; color:#fff; border:none; padding:15px; border-radius:12px; font-weight:700; width:100%; margin-top:20px; font-size:16px; cursor:pointer; box-shadow:0 4px 15px rgba(62,207,142,0.2); }
-        
-        /* 导出控制区 */
-        .export-box { background:#fff; padding:15px; border-radius:12px; margin-bottom:20px; border:1px solid #e1e4e8; }
-        .date-row { display:flex; gap:10px; margin-bottom:10px; }
-        .date-input { flex:1; padding:8px; border:1px solid #ddd; border-radius:8px; font-family:inherit; }
-        .btn-export { width:100%; background:#333; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer; }
+        /* 输入区 */
+        .input-card { background:#fff; padding:15px; border-radius:16px; box-shadow:0 2px 10px rgba(0,0,0,0.03); margin-bottom:20px; }
+        textarea { width:100%; border:none; height:80px; resize:none; font-size:16px; outline:none; font-family:inherit; }
+        .action-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:10px; border-top:1px solid #f0f0f0; padding-top:10px; }
+        .btn-tool { display:flex; flex-direction:column; align-items:center; background:#f8f9fa; border-radius:10px; padding:10px 0; color:#666; font-size:12px; font-weight:600; cursor:pointer; }
+        .btn-submit { background:#3ecf8e; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:700; width:100%; margin-top:15px; font-size:15px; cursor:pointer; }
+        .recording-state { background:#fff2f0; color:#ff4d4f; animation:pulse 1.5s infinite; }
 
-        /* 列表项 */
-        .filter-select { width:100%; padding:12px; margin-bottom:20px; border-radius:10px; border:1px solid #ddd; background:#fff; font-size:14px; -webkit-appearance:none; }
-        .list-item { background:#fff; padding:20px; border-radius:16px; margin-bottom:15px; box-shadow:0 2px 10px rgba(0,0,0,0.03); }
-        .item-header { display:flex; justify-content:space-between; margin-bottom:10px; font-size:13px; color:#999; }
-        .name-label { background:#e6f7ff; color:#0099ff; padding:4px 8px; border-radius:6px; font-weight:700; font-size:12px; }
-        .item-content { font-size:16px; line-height:1.6; color:#333; white-space:pre-wrap; }
-        .item-img { max-width:100%; border-radius:12px; margin-top:12px; border:1px solid #eee; display:block; }
+        /* 列表展示 */
+        .group-section { margin-bottom:25px; }
+        .group-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+        .group-title { font-size:16px; font-weight:700; color:#333; padding-left:8px; border-left:4px solid #3ecf8e; }
+        .group-count { font-size:12px; background:#e1e4e8; color:#555; padding:2px 8px; border-radius:10px; }
+        
+        .list-item { background:#fff; padding:15px; border-radius:12px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border:1px solid rgba(0,0,0,0.02); }
+        .item-meta { display:flex; justify-content:space-between; font-size:12px; color:#999; margin-bottom:6px; }
+        .item-content { font-size:15px; line-height:1.6; color:#333; white-space:pre-wrap; }
+        .item-img { max-width:100%; border-radius:8px; margin-top:10px; border:1px solid #eee; display:block; }
 
         @keyframes pulse { 0% {box-shadow:0 0 0 0 rgba(255,77,79,0.4);} 70% {box-shadow:0 0 0 10px rgba(255,77,79,0);} 100% {box-shadow:0 0 0 0 rgba(255,77,79,0);} }
         .loading-mask { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index:999; display:flex; justify-content:center; align-items:center; flex-direction:column; }
@@ -61,28 +60,50 @@
 </head>
 <body>
     <div id="app" class="container">
-        <!-- 登录界面 -->
+        
+        <!-- ================= 登录页 ================= -->
         <div v-if="!user" class="login-box">
             <div class="login-title">🧪 实验室记录助手</div>
             <div style="color:#999; margin-bottom:30px;">请输入姓名拼音登录</div>
             <input v-model="username" class="login-input" placeholder="姓名拼音 (如: lihua)" autocapitalize="off" autocorrect="off">
             <input v-model="password" type="password" class="login-input" placeholder="密码 (默认建议: 123456)">
             <button class="btn-auth" @click="handleLogin">进入系统</button>
-            <div style="font-size:12px; color:#ccc; margin-top:20px;">首次登录将自动为您注册账号</div>
         </div>
 
-        <!-- 主功能界面 -->
+        <!-- ================= 主界面 ================= -->
         <div v-else>
-            <div class="header">
-                <div class="user-tag">
-                    Hi, {{ formatName(user.email) }}
-                    <span v-if="isLeader" class="role-badge">管理员</span>
+            
+            <!-- 1. 顶部控制栏 -->
+            <div class="sticky-header">
+                <div class="header-row">
+                    <div class="user-tag">Hi, {{ formatName(user.email) }}<span v-if="isLeader" class="role-badge">管理员</span></div>
+                    <div @click="signOut" style="cursor:pointer; font-size:13px; color:#999; text-decoration:underline;">退出</div>
                 </div>
-                <div class="btn-logout" @click="signOut">退出登录</div>
+
+                <div class="filter-card">
+                    <!-- 领导可见：选人 -->
+                    <select v-if="isLeader" v-model="selectedUserFilter" class="user-select">
+                        <option value="all">👥 查看所有组员 (按人名归类)</option>
+                        <option v-for="u in uniqueUsers" :value="u">👤 只看 {{ formatName(u) }}</option>
+                    </select>
+                    
+                    <!-- 所有人可见：日期筛选 -->
+                    <div class="filter-label">📅 日期范围 / 历史回看</div>
+                    <div class="date-row">
+                        <input type="date" v-model="startDate" class="date-input">
+                        <span style="color:#ccc;">至</span>
+                        <input type="date" v-model="endDate" class="date-input">
+                    </div>
+                    
+                    <button class="btn-export" @click="generateWord">
+                        <span>📥</span> 导出当前显示的记录 (Word)
+                    </button>
+                </div>
             </div>
 
-            <div class="card">
-                <textarea v-model="inputText" placeholder="记录实验数据、灵感... 点击下方「语音」可直接说话"></textarea>
+            <!-- 2. 输入记录卡片 -->
+            <div class="input-card">
+                <textarea v-model="inputText" placeholder="记录实验进展... (支持语音输入)"></textarea>
                 <div class="action-grid">
                     <div class="btn-tool" :class="{'recording-state':isRecording}" @click="toggleSpeech">
                         <span>{{ isRecording ? '⏹️' : '🎤' }}</span>{{ isRecording ? '停止' : '语音' }}
@@ -95,36 +116,32 @@
                 <input type="file" ref="gal" accept="image/*" style="display:none" @change="handleFile">
             </div>
 
-            <!-- 领导筛选 -->
-            <div v-if="isLeader">
-                <select v-model="selectedUserFilter" class="filter-select">
-                    <option value="all">📂 查看所有人的记录</option>
-                    <option v-for="u in uniqueUsers" :value="u">👤 只看 {{ formatName(u) }}</option>
-                </select>
-            </div>
-
-            <!-- 导出区域 (所有人都可见) -->
-            <div class="export-box">
-                <div style="font-size:14px; font-weight:bold; margin-bottom:10px;">📅 导出 Word 报告</div>
-                <div class="date-row">
-                    <input type="date" v-model="startDate" class="date-input" title="开始日期">
-                    <input type="date" v-model="endDate" class="date-input" title="结束日期">
+            <!-- 3. 记录展示区 (按天分类) -->
+            <div class="list-container">
+                <div v-if="groupedList.length === 0" style="text-align:center; padding:40px; color:#ccc;">
+                    <div style="font-size:40px; margin-bottom:10px;">📭</div>
+                    当前日期范围内无记录
                 </div>
-                <button class="btn-export" @click="generateWord">📤 导出选定日期的记录</button>
-            </div>
 
-            <!-- 列表展示 -->
-            <div v-if="filteredRecords.length === 0" style="text-align:center; padding:40px; color:#ccc;">
-                <div style="font-size:40px; margin-bottom:10px;">📭</div>暂时没有记录
-            </div>
-
-            <div v-for="item in filteredRecords" :key="item.id" class="list-item">
-                <div class="item-header">
-                    <span class="name-label">{{ formatName(item.email) }}</span>
-                    <span>{{ formatTime(item.created_at) }}</span>
+                <!-- 循环渲染分组 -->
+                <div v-for="(group, index) in groupedList" :key="index" class="group-section">
+                    <div class="group-header">
+                        <div class="group-title">{{ group.title }}</div>
+                        <span class="group-count">{{ group.list.length }}条</span>
+                    </div>
+                    
+                    <div v-for="item in group.list" :key="item.id" class="list-item">
+                        <div class="item-meta">
+                            <!-- 组员视图不显示自己名字，领导视图显示名字 -->
+                            <span>{{ isLeader && selectedUserFilter === 'all' ? '' : formatTimeOnly(item.created_at) }}</span>
+                            <!-- 如果是日期分组，右侧显示具体时间 -->
+                            <span v-if="!isLeader || selectedUserFilter !== 'all'" style="color:#bbb">{{ formatTimeOnly(item.created_at) }}</span>
+                        </div>
+                        
+                        <div v-if="item.type==='text'" class="item-content">{{ item.content }}</div>
+                        <div v-if="item.type==='image'"><img :src="item.content" class="item-img" loading="lazy" onclick="window.open(this.src)"></div>
+                    </div>
                 </div>
-                <div v-if="item.type==='text'" class="item-content">{{ item.content }}</div>
-                <div v-if="item.type==='image'"><img :src="item.content" class="item-img" loading="lazy" onclick="window.open(this.src)"></div>
             </div>
         </div>
 
@@ -136,16 +153,14 @@
 
     <script>
         // ============================================================
-        // ⚠️⚠️⚠️ 请在这里填入配置（引号内不要换行！）⚠️⚠️⚠️
+        // 🚀 配置区域 (已填入你的信息)
         // ============================================================
         
-        // 1. 填入 Supabase URL
         const SUPABASE_URL = 'https://aampvlfsesvtzfnmvvbp.supabase.co'; 
         
-        // 2. 填入 Supabase Anon Key
+        // 注意：如果运行报错401，请检查这个 Key 是否正确 (通常是 eyJ 开头)
         const SUPABASE_KEY = 'sb_publishable_1_pxVl2u74y-orx9fQfadQ_PSl1HQar'; 
         
-        // 3. 领导账号拼音
         const LEADER_EMAIL = 'dongchao@lab.com';
         
         // ============================================================
@@ -155,21 +170,81 @@
 
         Vue.createApp({
             data() {
-                // 默认日期：今天和7天前
                 const end = new Date();
                 const start = new Date();
-                start.setDate(end.getDate() - 7);
-                
+                start.setDate(end.getDate() - 7); // 默认显示最近7天
                 return { 
-                    user:null, username:'', password:'', inputText:'', records:[], 
-                    loading:false, isRecording:false, recognition:null, selectedUserFilter:'all', isLeader:false,
+                    user:null, username:'', password:'', inputText:'', records:[], loading:false, isRecording:false, recognition:null, 
+                    selectedUserFilter:'all', isLeader:false,
                     startDate: start.toISOString().slice(0,10),
                     endDate: end.toISOString().slice(0,10)
                 } 
             },
             computed: {
                 uniqueUsers() { return Array.from(new Set(this.records.map(r => r.email))); },
-                filteredRecords() { return this.selectedUserFilter === 'all' ? this.records : this.records.filter(r => r.email === this.selectedUserFilter); }
+                
+                // 【核心逻辑】智能分组数据
+                groupedList() {
+                    // 1. 日期筛选
+                    const start = new Date(this.startDate); start.setHours(0,0,0,0);
+                    const end = new Date(this.endDate); end.setHours(23,59,59,999);
+                    
+                    let filtered = this.records.filter(r => {
+                        const t = new Date(r.created_at);
+                        return t >= start && t <= end;
+                    });
+
+                    // 2. 领导筛选用户
+                    if (this.isLeader && this.selectedUserFilter !== 'all') {
+                        filtered = filtered.filter(r => r.email === this.selectedUserFilter);
+                    }
+
+                    // 3. 开始分组
+                    // 如果是【领导】看【所有人】：按【人名】分组
+                    // 如果是【组员】看【自己】(或领导看单人)：按【日期】分组
+                    
+                    const groupByDate = (!this.isLeader) || (this.isLeader && this.selectedUserFilter !== 'all');
+                    
+                    const groups = [];
+                    let currentKey = null;
+                    let currentGroup = null;
+
+                    // 这里的 records 默认是按时间倒序排列的 (Newest first)
+                    // 所以我们直接遍历，遇到新的一天/新人就建新组
+                    
+                    // 为了让领导分组更聚集，领导视图下如果是所有人，我们先按人名排序一下？
+                    // 不，保持时间流可能更好，或者用字典归类。这里采用字典归类更稳。
+                    
+                    const mapGroups = {};
+                    
+                    if (!groupByDate) {
+                        // === 按人名分组 (Leader View) ===
+                        filtered.forEach(item => {
+                            const name = this.formatName(item.email);
+                            if (!mapGroups[name]) mapGroups[name] = [];
+                            mapGroups[name].push(item);
+                        });
+                        return Object.keys(mapGroups).map(name => ({ title: name, list: mapGroups[name] }));
+                    } else {
+                        // === 按日期分组 (Member View) ===
+                        filtered.forEach(item => {
+                            const d = new Date(item.created_at);
+                            // 格式化日期标题：2026年1月6日 (星期二)
+                            const dateKey = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+                            
+                            // 简单的顺序分组法
+                            if (dateKey !== currentKey) {
+                                if (currentGroup) groups.push(currentGroup);
+                                currentGroup = { title: dateKey, list: [item] };
+                                currentKey = dateKey;
+                            } else {
+                                currentGroup.list.push(item);
+                            }
+                        });
+                        if (currentGroup) groups.push(currentGroup);
+                        return groups;
+                    }
+                }
             },
             async mounted() {
                 const { data:{ session } } = await client.auth.getSession();
@@ -178,20 +253,20 @@
                 this.initSpeech();
             },
             methods: {
-                formatName(e) { return e ? e.split('@')[0] : '用户'; },
+                formatName(e) { return e ? e.split('@')[0] : 'User'; },
+                formatTimeOnly(s) { return new Date(s).toLocaleString('zh-CN', {hour:'2-digit', minute:'2-digit'}); },
                 setUser(u) { this.user = u; if(u) this.isLeader = (u.email === LEADER_EMAIL); },
+                
                 async handleLogin() {
-                    if(!this.username || !this.password) return alert('请输入完整信息');
+                    if(!this.username || !this.password) return alert('请输入信息');
                     this.loading = true;
                     const email = this.username.trim().toLowerCase() + '@lab.com';
                     let { error } = await client.auth.signInWithPassword({ email, password:this.password });
                     if(error) {
-                        if(error.message.includes('Invalid login') || error.message.includes('not found')) {
+                        if(error.message.includes('Invalid') || error.message.includes('not found')) {
                             const { error:sErr } = await client.auth.signUp({ email, password:this.password });
-                            if(sErr) alert('注册失败: '+sErr.message); else alert('注册成功，欢迎使用！');
-                        } else {
-                            alert('登录失败: '+error.message);
-                        }
+                            if(sErr) alert('注册失败:'+sErr.message); else alert('注册成功');
+                        } else alert('登录失败:'+error.message);
                     }
                     this.loading = false;
                 },
@@ -215,7 +290,7 @@
                     }
                 },
                 toggleSpeech() {
-                    if(!this.recognition) return alert('请使用 Chrome 或 Safari 浏览器');
+                    if(!this.recognition) return alert('请使用 Chrome/Safari');
                     if(this.isRecording) this.recognition.stop(); else { this.recognition.start(); this.isRecording = true; }
                 },
                 async sendText() {
@@ -228,58 +303,45 @@
                     const f = e.target.files[0]; if(!f) return;
                     this.loading = true;
                     try {
-                        // 使用简单时间戳文件名
                         const name = `${Date.now()}.${f.name.split('.').pop()}`;
-                        const { error } = await client.storage.from('files').upload(name, f); 
-                        if(error) throw error;
-                        
+                        const { error } = await client.storage.from('files').upload(name, f); if(error) throw error;
                         const { data } = client.storage.from('files').getPublicUrl(name);
                         await client.from('records').insert({ user_id:this.user.id, email:this.user.email, type:'image', content:data.publicUrl });
-                    } catch(err) { alert('上传失败: ' + err.message); } finally { this.loading = false; e.target.value=''; }
+                    } catch(err) { alert('上传失败'); } finally { this.loading = false; e.target.value=''; }
                 },
                 
-                // 🛠️ 导出功能：增加日期筛选和颜色格式修复
                 async generateWord() {
+                    if(this.groupedList.length === 0) return alert("当前范围内无记录");
                     const { Document, Packer, Paragraph, TextRun } = docx;
-                    
-                    // 1. 筛选日期
-                    const start = new Date(this.startDate); start.setHours(0,0,0,0);
-                    const end = new Date(this.endDate); end.setHours(23,59,59,999);
-                    
-                    // 过滤当前列表（领导筛选后的列表 -> 再按日期筛）
-                    const targetRecords = this.filteredRecords.filter(item => {
-                        const t = new Date(item.created_at);
-                        return t >= start && t <= end;
-                    });
-
-                    if(targetRecords.length === 0) return alert("该时间段内没有记录！");
-
                     const children = [ 
-                        new Paragraph({ children:[new TextRun({ text:`实验记录汇总 (${this.startDate} ~ ${this.endDate})`, bold:true, size:40 })] }), 
-                        new Paragraph({ text:"--------------------------------" }) 
+                        new Paragraph({ children:[new TextRun({ text:`实验记录 (${this.startDate} ~ ${this.endDate})`, bold:true, size:36 })] }), 
+                        new Paragraph({ text:" " }) 
                     ];
                     
-                    targetRecords.forEach(i => {
-                        // 2. 修复颜色代码，必须是 6 位 Hex (例如 "444444")
-                        children.push(new Paragraph({ children:[new TextRun({ text:`【${this.formatName(i.email)}】 ${this.formatTime(i.created_at)}`, bold:true, color:"444444" })] }));
+                    // 遍历分组数据生成文档
+                    this.groupedList.forEach(group => {
+                        // 标题：日期 或 人名
+                        children.push(new Paragraph({ 
+                            children:[new TextRun({ text:`📌 ${group.title} (${group.list.length}条)`, bold:true, size:28, color:"2E8B57" })],
+                            spacing: { before: 400, after: 200 }
+                        }));
                         
-                        if(i.type==='text') {
-                            children.push(new Paragraph({ text:i.content }));
-                        } else {
-                            // 链接颜色也修复为标准蓝色
-                            children.push(new Paragraph({ text:`[图片附件]: ${i.content}`, color:"0000FF" }));
-                        }
-                        children.push(new Paragraph({ text:"" }));
-                        children.push(new Paragraph({ text:"------------------" }));
+                        group.list.forEach(i => {
+                            children.push(new Paragraph({ 
+                                children:[new TextRun({ text:`⏰ ${this.formatTimeOnly(i.created_at)}`, bold:true, color:"666666" })] 
+                            }));
+                            if(i.type==='text') children.push(new Paragraph({ text:i.content }));
+                            else children.push(new Paragraph({ text:`[图片附件]: ${i.content}`, color:"0000FF" }));
+                            children.push(new Paragraph({ text:"" }));
+                        });
                     });
 
                     const blob = await Packer.toBlob(new Document({ sections:[{ children }] }));
                     const a = document.createElement("a"); 
                     a.href = URL.createObjectURL(blob); 
-                    a.download = `记录_${this.startDate}_${this.endDate}.docx`; 
+                    a.download = `实验记录_${this.startDate}.docx`; 
                     a.click();
-                },
-                formatTime(s) { return new Date(s).toLocaleString('zh-CN', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'}); }
+                }
             }
         }).mount('#app');
     </script>
