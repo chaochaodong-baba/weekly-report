@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>实验室记录助手</title>
+    <!-- 国内高速源 -->
+    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docx@7.1.0/build/index.js"></script>
+    
+    <style>
+        /* 样式重置与基础布局 */
+        body { margin:0; padding:0; background:#f2f4f8; font-family:-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif; color:#333; }
+        .container { max-width:600px; margin:0 auto; padding:15px; padding-bottom:80px; }
+        
+        /* 登录组件 */
+        .login-box { background:#fff; padding:40px 25px; border-radius:16px; margin-top:60px; text-align:center; box-shadow:0 8px 30px rgba(0,0,0,0.08); }
+        .login-title { font-size:24px; font-weight:700; margin-bottom:10px; }
+        .login-input { width:100%; padding:14px; margin-bottom:15px; border:1px solid #eee; border-radius:10px; box-sizing:border-box; font-size:16px; background:#fafafa; outline:none; }
+        .btn-auth { width:100%; padding:14px; background:#3ecf8e; color:#fff; border:none; border-radius:10px; font-weight:700; font-size:16px; cursor:pointer; }
+        
+        /* 头部与列表 */
+        .header { display:flex; justify-content:space-between; align-items:center; padding:10px 5px; margin-bottom:15px; }
+        .user-tag { font-size:18px; font-weight:700; color:#2c3e50; }
+        .role-badge { background:#ff9f43; color:#fff; padding:2px 8px; border-radius:4px; font-size:12px; margin-left:5px; vertical-align:middle; }
+        
+        /* 卡片与按钮 */
+        .card { background:#fff; padding:15px; border-radius:12px; box-shadow:0 2px 10px rgba(0,0,0,0.03); margin-bottom:20px; }
+        textarea { width:100%; border:none; height:100px; resize:none; font-size:16px; outline:none; box-sizing:border-box; font-family:inherit; }
+        .action-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:15px; border-top:1px solid #eee; padding-top:15px; }
+        .btn-tool { display:flex; flex-direction:column; align-items:center; background:#f8f9fa; border:1px solid #eee; border-radius:10px; padding:12px 0; color:#555; font-size:13px; font-weight:500; cursor:pointer; }
+        .btn-submit { background:#3ecf8e; color:#fff; border:none; padding:12px; border-radius:10px; font-weight:700; width:100%; margin-top:15px; cursor:pointer; }
+        .recording-state { background:#fff1f0; border-color:#ffccc7; color:#ff4d4f; animation:pulse 1.5s infinite; }
+        @keyframes pulse { 0% {box-shadow:0 0 0 0 rgba(255,77,79,0.4);} 70% {box-shadow:0 0 0 10px rgba(255,77,79,0);} 100% {box-shadow:0 0 0 0 rgba(255,77,79,0);} }
+        
+        /* 列表项 */
+        .list-item { background:#fff; padding:15px; border-radius:12px; margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+        .item-header { display:flex; justify-content:space-between; margin-bottom:8px; font-size:12px; color:#999; }
+        .name-label { background:#e6f7ff; color:#1890ff; padding:2px 6px; border-radius:4px; font-weight:600; }
+        .item-img { max-width:100%; border-radius:8px; margin-top:10px; display:block; border:1px solid #eee; }
+        .filter-select { width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd; background:#fff; }
+    </style>
+</head>
+<body>
+    <!-- 🟢 这里的 Script 放到了 Body 里，防止加载顺序问题 -->
+    <div id="app" class="container">
+        <!-- 登录页 -->
+        <div v-if="!user" class="login-box">
+            <div class="login-title">🧪 实验室记录助手</div>
+            <div style="color:#888; margin-bottom:30px;">请输入姓名拼音登录</div>
+            <input v-model="username" class="login-input" placeholder="姓名拼音 (如: lihua)" autocapitalize="off">
+            <input v-model="password" type="password" class="login-input" placeholder="密码 (默认: 123456)">
+            <button class="btn-auth" @click="handleLogin">进入系统</button>
+        </div>
+
+        <!-- 主界面 -->
+        <div v-else>
+            <div class="header">
+                <div class="user-tag">Hi, {{ formatName(user.email) }} <span v-if="isLeader" class="role-badge">管理员</span></div>
+                <div @click="signOut" style="color:#999; text-decoration:underline; cursor:pointer; font-size:14px;">退出</div>
+            </div>
+
+            <div class="card">
+                <textarea v-model="inputText" placeholder="点击「语音输入」说话，或直接打字..."></textarea>
+                <div class="action-grid">
+                    <div class="btn-tool" :class="{'recording-state':isRecording}" @click="toggleSpeech">
+                        <span style="font-size:20px">{{ isRecording ? '⏹️' : '🎤' }}</span>{{ isRecording ? '停止' : '语音' }}
+                    </div>
+                    <div class="btn-tool" @click="$refs.cam.click()"><span style="font-size:20px">📷</span>拍照</div>
+                    <div class="btn-tool" @click="$refs.gal.click()"><span style="font-size:20px">🖼️</span>相册</div>
+                </div>
+                <button class="btn-submit" @click="sendText">提交记录</button>
+                <input type="file" ref="cam" accept="image/*" capture="environment" style="display:none" @change="handleFile">
+                <input type="file" ref="gal" accept="image/*" style="display:none" @change="handleFile">
+            </div>
+
+            <div v-if="isLeader">
+                <select v-model="selectedUserFilter" class="filter-select">
+                    <option value="all">📂 查看所有人</option>
+                    <option v-for="u in uniqueUsers" :value="u">👤 {{ formatName(u) }}</option>
+                </select>
+            </div>
+
+            <div v-if="loading" style="text-align:center; padding:20px; color:#666;">🔄 处理中...</div>
+
+            <div v-for="item in filteredRecords" :key="item.id" class="list-item">
+                <div class="item-header">
+                    <span class="name-label">{{ formatName(item.email) }}</span>
+                    <span>{{ formatTime(item.created_at) }}</span>
+                </div>
+                <div v-if="item.type==='text'" style="font-size:16px; line-height:1.6; white-space:pre-wrap;">{{ item.content }}</div>
+                <div v-if="item.type==='image'"><img :src="item.content" class="item-img" loading="lazy" onclick="window.open(this.src)"></div>
+            </div>
+            
+            <button @click="generateWord" style="width:100%; background:#333; color:#fff; padding:12px; border-radius:10px; margin-top:20px; border:none; font-weight:bold;">📤 导出 Word</button>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 🛑 请在这里填入你的配置（注意：引号内不要换行！）
+        // ============================================================
+        
+        const SUPABASE_URL = 'https://aampvlfsesvtzfnmvvbp.supabase.co'; 
+        
+        const SUPABASE_KEY = 'sb_publishable_1_pxVl2u74y-orx9fQfadQ_PSl1HQar'; 
+        
+        const LEADER_EMAIL = 'dongchao@lab.com';
+        
+        // ============================================================
+
+        const { createClient } = supabase;
+        const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        Vue.createApp({
+            data() { return { user:null, username:'', password:'', inputText:'', records:[], loading:false, isRecording:false, recognition:null, selectedUserFilter:'all', isLeader:false } },
+            computed: {
+                uniqueUsers() { return Array.from(new Set(this.records.map(r => r.email))); },
+                filteredRecords() { return this.selectedUserFilter === 'all' ? this.records : this.records.filter(r => r.email === this.selectedUserFilter); }
+            },
+            async mounted() {
+                const { data:{ session } } = await client.auth.getSession();
+                if(session) { this.setUser(session.user); this.loadRecords(); }
+                client.auth.onAuthStateChange((_e, session) => { this.setUser(session ? session.user : null); if(session) this.loadRecords(); });
+                this.initSpeech();
+            },
+            methods: {
+                formatName(e) { return e ? e.split('@')[0] : 'User'; },
+                setUser(u) { this.user = u; if(u) this.isLeader = (u.email === LEADER_EMAIL); },
+                async handleLogin() {
+                    if(!this.username || !this.password) return alert('请输入信息');
+                    this.loading = true;
+                    const email = this.username.toLowerCase().trim() + '@lab.com';
+                    let { error } = await client.auth.signInWithPassword({ email, password:this.password });
+                    if(error && (error.message.includes('Invalid') || error.message.includes('not found'))) {
+                        const { error:sErr } = await client.auth.signUp({ email, password:this.password });
+                        if(sErr) alert('注册失败:'+sErr.message); else alert('注册成功，已登录');
+                    } else if(error) alert('登录失败:'+error.message);
+                    this.loading = false;
+                },
+                async signOut() { await client.auth.signOut(); this.records=[]; this.username=''; },
+                async loadRecords() {
+                    const { data } = await client.from('records').select('*').order('created_at', { ascending: false });
+                    if(data) this.records = data;
+                    client.channel('public:records').on('postgres_changes', { event:'INSERT', schema:'public', table:'records' }, p => {
+                        if(this.isLeader || p.new.user_id === this.user.id) this.records.unshift(p.new);
+                    }).subscribe();
+                },
+                initSpeech() {
+                    if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                        this.recognition = new SR(); this.recognition.lang='zh-CN'; this.recognition.continuous=true; this.recognition.interimResults=true;
+                        this.recognition.onresult = (e) => {
+                            let f = ''; for(let i=e.resultIndex; i<e.results.length; ++i) if(e.results[i].isFinal) f+=e.results[i][0].transcript;
+                            if(f) this.inputText += (this.inputText ? '，' : '') + f;
+                        };
+                        this.recognition.onend = () => this.isRecording = false;
+                    }
+                },
+                toggleSpeech() {
+                    if(!this.recognition) return alert('需使用 Chrome/Safari 浏览器');
+                    if(this.isRecording) this.recognition.stop(); else { this.recognition.start(); this.isRecording = true; }
+                },
+                async sendText() {
+                    if(!this.inputText.trim()) return;
+                    this.loading = true;
+                    await client.from('records').insert({ user_id:this.user.id, email:this.user.email, type:'text', content:this.inputText });
+                    this.inputText=''; this.loading=false;
+                },
+                async handleFile(e) {
+                    const f = e.target.files[0]; if(!f) return;
+                    this.loading = true;
+                    try {
+                        const name = `${Date.now()}_${this.formatName(this.user.email)}.${f.name.split('.').pop()}`;
+                        const { error } = await client.storage.from('files').upload(name, f); if(error) throw error;
+                        const { data } = client.storage.from('files').getPublicUrl(name);
+                        await client.from('records').insert({ user_id:this.user.id, email:this.user.email, type:'image', content:data.publicUrl });
+                    } catch(err) { alert('上传失败'); } finally { this.loading = false; e.target.value=''; }
+                },
+                async generateWord() {
+                    const { Document, Packer, Paragraph, TextRun } = docx;
+                    const children = [ new Paragraph({ children:[new TextRun({ text:"记录汇总", bold:true, size:40 })] }), new Paragraph({ text:"------------------" }) ];
+                    this.filteredRecords.forEach(i => {
+                        children.push(new Paragraph({ children:[new TextRun({ text:`【${this.formatName(i.email)}】 ${this.formatTime(i.created_at)}`, bold:true, color:"444" })] }));
+                        if(i.type==='text') children.push(new Paragraph({ text:i.content }));
+                        else children.push(new Paragraph({ text:`[图片]: ${i.content}`, color:"0000FF" }));
+                        children.push(new Paragraph({ text:"" }));
+                    });
+                    const blob = await Packer.toBlob(new Document({ sections:[{ children }] }));
+                    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `记录_${new Date().toISOString().slice(0,10)}.docx`; a.click();
+                },
+                formatTime(s) { return new Date(s).toLocaleString('zh-CN', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'}); }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
